@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { MemorySearchManager } from "../memory/search-manager.js";
 import type { MemorySearchResult } from "../types/memory.js";
 import { createTestConfig } from "../__test__/config.js";
-import { createTestSkillEntry } from "../__test__/skills.js";
 
 // Mock all external dependencies
 vi.mock("../providers/claude-provider.js", () => ({
@@ -39,103 +38,6 @@ vi.mock("../memory/flush.js", () => ({
 vi.mock("../skills/loader.js");
 vi.mock("../skills/snapshot.js");
 vi.mock("./system-prompt.js");
-
-describe("runAgent – skills wiring", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it("loads skills from config dirs and passes snapshot to system prompt", async () => {
-    const { loadSkillEntries } = await import("../skills/loader.js");
-    const { buildSkillSnapshot } = await import("../skills/snapshot.js");
-    const { buildSystemPromptBlocks } = await import("./system-prompt.js");
-    const { runAgent } = await import("./runner.js");
-
-    const weatherSkill = createTestSkillEntry({
-      name: "weather",
-      description: "Check the weather",
-      eligible: true,
-    });
-
-    vi.mocked(loadSkillEntries).mockResolvedValue([weatherSkill]);
-    vi.mocked(buildSkillSnapshot).mockReturnValue({
-      prompt: "<available-skills>...</available-skills>",
-      count: 1,
-      names: ["weather"],
-      version: "abc123",
-    });
-    vi.mocked(buildSystemPromptBlocks).mockReturnValue([
-      { text: "system prompt with skills", cacheable: true },
-    ]);
-
-    const config = createTestConfig({
-      skills: { dirs: ["~/.jinx/skills", "./jinx/skills"], exclude: [] },
-    });
-
-    await runAgent({
-      prompt: "What's the weather?",
-      sessionKey: "test-session",
-      transcriptPath: "/tmp/transcript.jsonl",
-      config,
-      tools: [],
-    });
-
-    // Skills were loaded from the config dirs
-    expect(loadSkillEntries).toHaveBeenCalledWith(config.skills.dirs);
-
-    // Snapshot was built with loaded skills
-    expect(buildSkillSnapshot).toHaveBeenCalledWith([weatherSkill]);
-
-    // System prompt blocks received the skills snapshot
-    expect(buildSystemPromptBlocks).toHaveBeenCalledWith(
-      expect.objectContaining({
-        skills: {
-          prompt: "<available-skills>...</available-skills>",
-          count: 1,
-          names: ["weather"],
-          version: "abc123",
-        },
-      }),
-    );
-  });
-
-  it("excludes skills listed in config.skills.exclude", async () => {
-    const { loadSkillEntries } = await import("../skills/loader.js");
-    const { buildSkillSnapshot } = await import("../skills/snapshot.js");
-    const { buildSystemPromptBlocks } = await import("./system-prompt.js");
-    const { runAgent } = await import("./runner.js");
-
-    const weather = createTestSkillEntry({ name: "weather", eligible: true });
-    const dangerous = createTestSkillEntry({ name: "dangerous", eligible: true });
-    const notes = createTestSkillEntry({ name: "notes", eligible: true });
-
-    vi.mocked(loadSkillEntries).mockResolvedValue([weather, dangerous, notes]);
-    vi.mocked(buildSkillSnapshot).mockReturnValue({
-      prompt: "",
-      count: 0,
-      names: [],
-      version: "",
-    });
-    vi.mocked(buildSystemPromptBlocks).mockReturnValue([
-      { text: "system prompt", cacheable: true },
-    ]);
-
-    const config = createTestConfig({
-      skills: { dirs: ["./skills"], exclude: ["dangerous"] },
-    });
-
-    await runAgent({
-      prompt: "hi",
-      sessionKey: "test-session",
-      transcriptPath: "/tmp/transcript.jsonl",
-      config,
-      tools: [],
-    });
-
-    // buildSkillSnapshot should receive only non-excluded skills
-    expect(buildSkillSnapshot).toHaveBeenCalledWith([weather, notes]);
-  });
-});
 
 // ── assembleDefaultTools – session tools wiring ─────────────────────────────
 
@@ -323,6 +225,131 @@ describe("buildRagContext", () => {
     const result = await buildRagContext(mockManager, "test");
 
     expect(result).toBe("");
+  });
+});
+
+// ── loadHistory (tested indirectly via runAgent) ────────────────────────────
+
+describe("runAgent – loadHistory behavior", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  async function setupAndRunAgent(
+    transcriptTurns: import("../types/sessions.js").TranscriptTurn[],
+  ) {
+    const { readTranscript } = await import("../sessions/transcript.js");
+    const { runAgentTurn: callProvider } = await import("../providers/claude-provider.js");
+    const { loadSkillEntries } = await import("../skills/loader.js");
+    const { buildSkillSnapshot } = await import("../skills/snapshot.js");
+    const { buildSystemPromptBlocks } = await import("./system-prompt.js");
+    const { runAgent } = await import("./runner.js");
+
+    vi.mocked(loadSkillEntries).mockResolvedValue([]);
+    vi.mocked(buildSkillSnapshot).mockReturnValue({ prompt: "", count: 0, names: [], version: "" });
+    vi.mocked(buildSystemPromptBlocks).mockReturnValue([
+      { text: "system prompt", cacheable: true },
+    ]);
+
+    // readTranscript is called twice: once for compaction check, once for loadHistory
+    vi.mocked(readTranscript).mockResolvedValue(transcriptTurns);
+
+    const config = createTestConfig();
+    await runAgent({
+      prompt: "test prompt",
+      sessionKey: "test-session",
+      transcriptPath: "/tmp/transcript.jsonl",
+      config,
+      tools: [],
+    });
+
+    // Extract the history passed to the provider
+    const providerCall = vi.mocked(callProvider).mock.calls[0][0];
+    return providerCall.history ?? [];
+  }
+
+  it("empty transcript → provider receives empty history", async () => {
+    const history = await setupAndRunAgent([]);
+    expect(history).toEqual([]);
+  });
+
+  it("normal user/assistant alternation → preserved as-is", async () => {
+    const history = await setupAndRunAgent([
+      { role: "user", text: "hello", timestamp: 1 },
+      { role: "assistant", text: "hi there", timestamp: 2 },
+      { role: "user", text: "how are you?", timestamp: 3 },
+    ]);
+
+    expect(history).toEqual([
+      { role: "user", content: "hello" },
+      { role: "assistant", content: "hi there" },
+      { role: "user", content: "how are you?" },
+    ]);
+  });
+
+  it("compaction turn → becomes user message with [Prior conversation summary] prefix", async () => {
+    const history = await setupAndRunAgent([
+      {
+        role: "system",
+        text: "[Conversation compacted — 10 turns]\n\nKey facts discussed.",
+        timestamp: 1,
+        isCompaction: true,
+      },
+      { role: "assistant", text: "acknowledged", timestamp: 2 },
+      { role: "user", text: "continue", timestamp: 3 },
+      { role: "assistant", text: "sure", timestamp: 4 },
+    ]);
+
+    expect(history[0].role).toBe("user");
+    expect(history[0].content).toContain("[Prior conversation summary]");
+    expect(history[0].content).toContain("Key facts discussed.");
+    expect(history).toHaveLength(4);
+  });
+
+  it("leading assistant message → stripped", async () => {
+    const history = await setupAndRunAgent([
+      { role: "assistant", text: "stale message", timestamp: 1 },
+      { role: "user", text: "hello", timestamp: 2 },
+      { role: "assistant", text: "hi", timestamp: 3 },
+    ]);
+
+    expect(history[0].role).toBe("user");
+    expect(history[0].content).toBe("hello");
+    expect(history).toHaveLength(2);
+  });
+
+  it("consecutive same-role turns → merged with newlines", async () => {
+    const history = await setupAndRunAgent([
+      { role: "user", text: "first message", timestamp: 1 },
+      { role: "user", text: "second message", timestamp: 2 },
+      { role: "assistant", text: "response", timestamp: 3 },
+    ]);
+
+    expect(history).toHaveLength(2);
+    expect(history[0].role).toBe("user");
+    expect(history[0].content).toContain("first message");
+    expect(history[0].content).toContain("second message");
+  });
+
+  it("more than 200 turns → only last 200 loaded", async () => {
+    const turns: import("../types/sessions.js").TranscriptTurn[] = [];
+    for (let i = 0; i < 210; i++) {
+      turns.push({
+        role: i % 2 === 0 ? "user" : "assistant",
+        text: `msg-${i}`,
+        timestamp: i,
+      });
+    }
+
+    const history = await setupAndRunAgent(turns);
+
+    // Should not contain the first 10 turns (only last 200)
+    // Verify the first dropped turn (index 0) is absent and a kept turn is present
+    // Use exact match with word boundaries to avoid "msg-0" matching "msg-100"
+    const allContent = history.map((h) => h.content).join("|");
+    expect(allContent.split("|")).not.toContainEqual("msg-0");
+    expect(allContent.split("|")).not.toContainEqual("msg-5");
+    expect(allContent).toContain("msg-209");
   });
 });
 

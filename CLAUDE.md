@@ -26,10 +26,10 @@ pnpm lint:fix             # Auto-fix lint issues + reformat
 
 ## Testing
 
-Three-tier test architecture with Vitest:
+Multi-tier test architecture with Vitest:
 
 ```bash
-pnpm test                 # Unit tests (1242+ tests)
+pnpm test                 # Unit tests
 pnpm test:integration     # Integration tests (subsystem boundaries)
 pnpm test:e2e             # System tests (end-to-end flows)
 pnpm test:all             # All three tiers sequentially
@@ -46,7 +46,26 @@ npx vitest run src/path/to/file.test.ts
 
 Test files are colocated: `foo.ts` → `foo.test.ts`. Integration tests: `src/__integration__/`. System tests: `src/__system__/`. Shared helpers: `src/__test__/`.
 
-Coverage thresholds enforced: 70% lines/functions/statements, 55% branches. Current: ~91% lines.
+Coverage thresholds enforced: 70% lines/functions/statements, 65% branches.
+
+Current test inventory: **128 unit test files (1,356 tests), 20 integration test files (102 tests), 16 system/live test files**. Coverage: ~90% statements, ~78% branches, ~91% functions.
+
+High-signal integration suites:
+
+- `src/__integration__/startup-lifecycle.integration.test.ts` (startup/shutdown hooks + webhook wiring + wake path)
+- `src/__integration__/cron-service-timer.integration.test.ts` (timer/backoff behavior at service level)
+- `src/__integration__/dispatch-streaming-order.integration.test.ts` (stream event ordering and lane behavior)
+- `src/__integration__/dispatch-timeout-lane.integration.test.ts` (timeout recovery and lane isolation under hung turns)
+- `src/__integration__/startup-cron-routing.integration.test.ts` (cron routing: direct delivery, fallback, and wake enqueueing)
+- `src/__integration__/startup-composio-routing.integration.test.ts` (Composio trigger startup wiring, routing to heartbeat, and unsubscribe teardown)
+- `src/__integration__/gateway-lifecycle.integration.test.ts` (WebSocket server+client handshake, auth rejection, concurrent sessions)
+- `src/__integration__/whatsapp-inbound.integration.test.ts` (WhatsApp dispatch + access control simulation)
+- `src/__integration__/telegram-inbound.integration.test.ts` (Telegram dispatch + access control simulation)
+- `src/__integration__/pipeline-delivery.integration.test.ts` (pipeline delivery, session auto-creation, streaming events)
+- `src/__integration__/session-lanes.integration.test.ts` (lane serialization and cross-session independence)
+- `src/__integration__/startup-http-webhook-auth.integration.test.ts` (startup HTTP webhook auth + Telegram webhook routing via real HTTP server)
+- `src/__integration__/startup-wake-retry.integration.test.ts` (wake coalescing, retry ceilings, and shutdown cancellation for pending retries)
+- `src/__integration__/heartbeat-delivery-routing.integration.test.ts` (heartbeat chunked delivery routing, fallback-to-terminal, and suppression behavior)
 
 ## Tech Stack & Conventions
 
@@ -125,6 +144,21 @@ Two features return `[]` by design (future work):
 
 - **MCP Bridge** (`agents/tools/mcp-bridge.ts`) — placeholder for MCP tool forwarding
 - **Channel cross-messaging tools** — placeholder for cross-channel message routing
+
+## CI/CD and GitHub
+
+Before pushing to GitHub or creating a public repository, read `docs/ci-cd-plan.md` and follow the pre-push checklist. It covers: secret scanning, GitHub Actions workflow setup, branch protection rules, and which test tiers to gate on.
+
+## Security
+
+Security audit report: `docs/security-audit-report.md` — validates all 35 items from the OpenClaw vulnerability register against Jinx. Scorecard: 25 resolved, 7 partially mitigated, 1 vulnerable. The source vulnerability register: `docs/security-checks.md`.
+
+Key security files:
+
+- `src/infra/security.ts` — Path validation, SSRF protection, env filtering, injection detection, secret redaction, content wrapping
+- `src/sandbox/mount-security.ts` — Blocked mount patterns for containers (.ssh, .env, .aws, credentials, etc.)
+- `src/agents/tools/core-tools.ts` — File access confinement (allowedDirs), identity file write protection, injection audit on writes
+- `src/agents/system-prompt.ts` — Anti-extraction directives, safety guidelines, untrusted content handling
 
 ## Lessons Learned
 

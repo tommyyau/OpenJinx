@@ -38,6 +38,8 @@ export interface MsgContext {
   timestamp: number;
   /** Raw channel-specific payload for channel-specific processing. */
   raw?: unknown;
+  /** Whether this is a system test message (isolated storage, no memory writes). */
+  isSystemTest?: boolean;
 }
 
 export interface MediaAttachment {

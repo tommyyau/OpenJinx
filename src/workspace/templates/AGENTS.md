@@ -49,3 +49,13 @@ When spawning subagents for tool-heavy tasks:
 - Keep subagent scope narrow and focused
 - Use the "light" model tier for simple tasks
 - Summarize subagent results before responding
+
+## Validation Discipline
+
+When changing behavior that crosses subsystems (timers, hooks, message routing, delivery):
+
+1. Prefer integration/system tests over shallow unit assertions
+2. Validate timer behavior with explicit timing assertions (schedule, retry, stop)
+3. Validate lifecycle hooks (startup wiring, teardown order, subscription cleanup)
+4. Validate message contracts end-to-end (ordering, dedup, failure handling)
+5. Add or update tests before claiming a workflow is reliable

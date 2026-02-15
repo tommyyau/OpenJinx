@@ -78,6 +78,54 @@ describe("createWhatsAppChannel", () => {
     });
   });
 
+  describe("send() when disconnected", () => {
+    it("returns undefined and does not send when socket is not connected", async () => {
+      // Re-mock session with isConnected = false
+      const { createWhatsAppSession } = await import("./session.js");
+      vi.mocked(createWhatsAppSession).mockResolvedValueOnce({
+        socket: {
+          sendMessage: vi.fn().mockResolvedValue(undefined),
+          sendPresenceUpdate: vi.fn().mockResolvedValue(undefined),
+          end: vi.fn(),
+          isConnected: false,
+        },
+        cleanup: vi.fn(),
+      });
+
+      const { sendMessageWhatsApp } = await import("./send.js");
+      const sendMock = vi.mocked(sendMessageWhatsApp);
+      sendMock.mockClear();
+
+      const channel = createWhatsAppChannel({ enabled: true, authDir: "/tmp/wa-auth" }, makeDeps());
+      await channel.start();
+
+      const result = await channel.send("123@s.whatsapp.net", { text: "hello" });
+
+      expect(result).toBeUndefined();
+      expect(sendMock).not.toHaveBeenCalled();
+      await channel.stop();
+    });
+
+    it("isReady() returns false when socket is not connected", async () => {
+      const { createWhatsAppSession } = await import("./session.js");
+      vi.mocked(createWhatsAppSession).mockResolvedValueOnce({
+        socket: {
+          sendMessage: vi.fn().mockResolvedValue(undefined),
+          sendPresenceUpdate: vi.fn().mockResolvedValue(undefined),
+          end: vi.fn(),
+          isConnected: false,
+        },
+        cleanup: vi.fn(),
+      });
+
+      const channel = createWhatsAppChannel({ enabled: true, authDir: "/tmp/wa-auth" }, makeDeps());
+      await channel.start();
+
+      expect(channel.isReady()).toBe(false);
+      await channel.stop();
+    });
+  });
+
   describe("send()", () => {
     it("formats markdown and sends via sendMessageWhatsApp", async () => {
       const { sendMessageWhatsApp } = await import("./send.js");
@@ -181,6 +229,37 @@ describe("createWhatsAppChannel", () => {
       await channel.send("123@s.whatsapp.net", { text: longText });
 
       expect(sendMock.mock.calls.length).toBeGreaterThanOrEqual(2);
+      await channel.stop();
+    });
+  });
+
+  describe("browserName", () => {
+    it("passes browserName from config to createWhatsAppSession", async () => {
+      const { createWhatsAppSession } = await import("./session.js");
+      const sessionMock = vi.mocked(createWhatsAppSession);
+      sessionMock.mockClear();
+
+      const channel = createWhatsAppChannel(
+        { enabled: true, authDir: "/tmp/wa-auth", browserName: "MyBot" },
+        makeDeps(),
+      );
+      await channel.start();
+
+      expect(sessionMock).toHaveBeenCalledWith(expect.any(String), expect.any(Object), "MyBot");
+
+      await channel.stop();
+    });
+
+    it("passes undefined browserName when not configured", async () => {
+      const { createWhatsAppSession } = await import("./session.js");
+      const sessionMock = vi.mocked(createWhatsAppSession);
+      sessionMock.mockClear();
+
+      const channel = createWhatsAppChannel({ enabled: true, authDir: "/tmp/wa-auth" }, makeDeps());
+      await channel.start();
+
+      expect(sessionMock).toHaveBeenCalledWith(expect.any(String), expect.any(Object), undefined);
+
       await channel.stop();
     });
   });

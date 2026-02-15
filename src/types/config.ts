@@ -87,6 +87,8 @@ export interface TelegramChannelConfig extends ChannelConfig {
 
 export interface WhatsAppChannelConfig extends ChannelConfig {
   authDir?: string;
+  /** Browser name shown in WhatsApp's Linked Devices list. */
+  browserName?: string;
 }
 
 export interface ChannelsConfig {

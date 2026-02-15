@@ -89,6 +89,7 @@ const whatsappSchema = z.object({
   groupPolicy: groupPolicy.optional(),
   allowFrom: z.array(z.string()).optional(),
   authDir: z.string().optional(),
+  browserName: z.string().optional(),
 });
 
 export const channelsSchema = z

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi, afterEach } from "vitest";
 import {
   acquireSessionLock,
   tryAcquireSessionLock,
@@ -63,5 +63,25 @@ describe("waitForSessionLock", () => {
     await expect(waitForSessionLock("wait-timeout-1", 200)).rejects.toThrow("Timed out");
 
     release();
+  });
+});
+
+describe("lock expiration", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("auto-expires lock after LOCK_TIMEOUT_MS (5 minutes)", () => {
+    vi.useFakeTimers();
+
+    // Acquire lock
+    acquireSessionLock("expire-test-1");
+    expect(isSessionLocked("expire-test-1")).toBe(true);
+
+    // Advance past the 5-minute timeout
+    vi.advanceTimersByTime(5 * 60 * 1000 + 1);
+
+    // isSessionLocked calls cleanExpiredLocks internally
+    expect(isSessionLocked("expire-test-1")).toBe(false);
   });
 });

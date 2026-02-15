@@ -66,6 +66,8 @@ export interface RunAgentOptions {
   senderName?: string;
   isGroup?: boolean;
   groupName?: string;
+  /** Whether this is a system test turn — skips memory tools and RAG. */
+  isSystemTest?: boolean;
 }
 
 /**
@@ -108,7 +110,7 @@ export async function runAgent(options: RunAgentOptions): Promise<AgentResult> {
     assembleDefaultTools(
       workspaceDir,
       memoryDir,
-      options.searchManager,
+      options.isSystemTest ? undefined : options.searchManager,
       config,
       options.cronService,
       sessionKey,
@@ -117,6 +119,7 @@ export async function runAgent(options: RunAgentOptions): Promise<AgentResult> {
       options.containerManager,
       options.channel,
       sessionType,
+      options.isSystemTest,
     );
 
   // 5. Load skills and build snapshot
@@ -144,10 +147,11 @@ export async function runAgent(options: RunAgentOptions): Promise<AgentResult> {
   // Build structured blocks for prompt caching
   const systemBlocks = buildSystemPromptBlocks(promptOptions);
 
-  // 6. RAG pre-search — surface relevant memory before the LLM call
-  const ragContext = options.searchManager
-    ? await buildRagContext(options.searchManager, prompt)
-    : "";
+  // 6. RAG pre-search — surface relevant memory before the LLM call (skip for system tests)
+  const ragContext =
+    options.searchManager && !options.isSystemTest
+      ? await buildRagContext(options.searchManager, prompt)
+      : "";
   if (ragContext) {
     systemBlocks.push({ text: ragContext, cacheable: false });
   }
@@ -161,10 +165,10 @@ export async function runAgent(options: RunAgentOptions): Promise<AgentResult> {
   // 6.5. Pre-compaction flush + compact transcript if approaching context limit
   const contextWindow = getContextWindow(modelId);
 
-  // Only flush if compaction is likely — check transcript size first
+  // Only flush if compaction is likely — check transcript size first (skip for system tests)
   const preFlushTurns = await readTranscript(transcriptPath);
   const estimatedTokens = estimateTranscriptTokens(preFlushTurns);
-  if (needsCompaction(estimatedTokens, contextWindow)) {
+  if (!options.isSystemTest && needsCompaction(estimatedTokens, contextWindow)) {
     await flushMemoryBeforeCompaction({
       sessionKey,
       contextSummary: `Context at ${contextWindow} token window, ~${estimatedTokens} tokens used`,
@@ -358,11 +362,13 @@ export function assembleDefaultTools(
   originChannel?: string,
   /** Session type for tiered file protection. */
   sessionType?: string,
+  /** Whether to exclude memory tools (system test isolation). */
+  isSystemTest?: boolean,
 ): AgentToolDefinition[] {
   const allowedDirs = [workspaceDir, memoryDir];
 
   const core = getCoreToolDefinitions({ allowedDirs, sessionType });
-  const memory = getMemoryToolDefinitions({ memoryDir, searchManager });
+  const memory = isSystemTest ? [] : getMemoryToolDefinitions({ memoryDir, searchManager });
   const channel = getChannelToolDefinitions(
     sessions && channels
       ? {
@@ -375,7 +381,8 @@ export function assembleDefaultTools(
             try {
               await ch.send(to, { text });
               return true;
-            } catch {
+            } catch (err) {
+              logger.warn(`Channel send failed: channel=${channelName} to=${to}`, err);
               return false;
             }
           },

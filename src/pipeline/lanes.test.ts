@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { Lane } from "./lanes.js";
 
 describe("Lane", () => {
@@ -183,6 +183,93 @@ describe("Lane error handling", () => {
     await p1;
     await p2;
     expect(order).toEqual([2]);
+  });
+});
+
+describe("Lane TTL eviction", () => {
+  beforeEach(async () => {
+    // Stop any existing sweep timer (from prior tests) before enabling fake timers
+    const { stopLaneSweep } = await import("./lanes.js");
+    stopLaneSweep();
+    vi.useFakeTimers();
+  });
+
+  afterEach(async () => {
+    const { stopLaneSweep } = await import("./lanes.js");
+    stopLaneSweep();
+    vi.useRealTimers();
+  });
+
+  it("evicts idle lanes past TTL", async () => {
+    const { getSessionLane } = await import("./lanes.js");
+
+    const key = "ttl-evict-unique-xyz";
+    // getSessionLane restarts sweep timer (now under fake timers)
+    const lane = getSessionLane(key);
+    expect(lane.running).toBe(0);
+    expect(lane.pending).toBe(0);
+
+    // Advance past TTL (30 min) + sweep interval to trigger eviction
+    vi.advanceTimersByTime(31 * 60_000);
+
+    // Requesting the same key should yield a NEW lane instance (old was evicted)
+    const lane2 = getSessionLane(key);
+    expect(lane2).not.toBe(lane);
+  });
+
+  it("does not evict lane with running tasks", async () => {
+    const { getSessionLane } = await import("./lanes.js");
+
+    const lane = getSessionLane("ttl-active-test-unique");
+
+    // Keep a task running
+    let unblock: () => void;
+    const blocker = new Promise<void>((r) => (unblock = r));
+    const task = lane.enqueue(() => blocker);
+
+    // Let the enqueue start
+    vi.advanceTimersByTime(10);
+    expect(lane.running).toBe(1);
+
+    // Advance past TTL
+    vi.advanceTimersByTime(31 * 60_000);
+
+    // Lane with running task should still exist (not evicted)
+    const lane2 = getSessionLane("ttl-active-test-unique");
+    expect(lane2).toBe(lane);
+
+    // Clean up
+    unblock!();
+    vi.useRealTimers();
+    await task;
+  });
+
+  it("does not evict lane with pending items", async () => {
+    const { getSessionLane } = await import("./lanes.js");
+
+    const lane = getSessionLane("ttl-pending-test-unique");
+
+    // Block the lane with a task, then enqueue a pending one
+    let unblock: () => void;
+    const blocker = new Promise<void>((r) => (unblock = r));
+    const task1 = lane.enqueue(() => blocker);
+    vi.advanceTimersByTime(10);
+
+    const task2 = lane.enqueue(async () => {});
+    expect(lane.pending).toBeGreaterThanOrEqual(1);
+
+    // Advance past TTL
+    vi.advanceTimersByTime(31 * 60_000);
+
+    // Lane should not be evicted (still has pending+running work)
+    const lane2 = getSessionLane("ttl-pending-test-unique");
+    expect(lane2).toBe(lane);
+
+    // Clean up
+    unblock!();
+    vi.useRealTimers();
+    await task1;
+    await task2;
   });
 });
 

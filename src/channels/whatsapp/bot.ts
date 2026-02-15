@@ -36,6 +36,11 @@ export function createWhatsAppChannel(
   /** Core send logic shared by stream callbacks and channel.send(). */
   async function sendText(jid: string, text: string): Promise<void> {
     if (!socket) {
+      logger.warn(`Cannot send to ${jid}: socket not initialized`);
+      return;
+    }
+    if (!socket.isConnected) {
+      logger.warn(`Cannot send to ${jid}: socket not connected`);
       return;
     }
     const formatted = markdownToWhatsApp(text);
@@ -93,9 +98,13 @@ export function createWhatsAppChannel(
     // Show typing indicator while agent is thinking
     let typingTimer: ReturnType<typeof setInterval> | undefined;
     if (socket) {
-      socket.sendPresenceUpdate("composing", jid).catch(() => {});
+      socket
+        .sendPresenceUpdate("composing", jid)
+        .catch((e) => logger.debug("Presence update failed", e));
       typingTimer = setInterval(() => {
-        socket?.sendPresenceUpdate("composing", jid).catch(() => {});
+        socket
+          ?.sendPresenceUpdate("composing", jid)
+          .catch((e) => logger.debug("Presence update failed", e));
       }, TYPING_REFRESH_MS);
     }
 
@@ -107,7 +116,9 @@ export function createWhatsAppChannel(
       if (typingTimer) {
         clearInterval(typingTimer);
       }
-      socket?.sendPresenceUpdate("available", jid).catch(() => {});
+      socket
+        ?.sendPresenceUpdate("available", jid)
+        .catch((e) => logger.debug("Presence update failed", e));
     }
   }
 
@@ -130,20 +141,29 @@ export function createWhatsAppChannel(
       // Create a single Baileys session. Baileys handles its own
       // internal reconnection — we don't need a monitor creating
       // new sessions repeatedly.
-      const result = await createWhatsAppSession(authDir, {
-        onMessage: handleMessage,
-        onConnectionUpdate: (update) => {
-          if (update.isLoggedOut) {
-            logger.warn("WhatsApp session logged out — restart gateway and re-scan QR");
-          }
+      const result = await createWhatsAppSession(
+        authDir,
+        {
+          onMessage: handleMessage,
+          onConnectionUpdate: (update) => {
+            if (update.connection === "open") {
+              logger.info("WhatsApp socket connected — channel fully ready");
+            }
+            if (update.isLoggedOut) {
+              logger.warn("WhatsApp session logged out — restart gateway and re-scan QR");
+            }
+          },
         },
-      });
+        whatsappConfig.browserName,
+      );
 
       socket = result.socket;
       sessionCleanup = result.cleanup;
       started = true;
 
-      logger.info("WhatsApp channel started — waiting for connection...");
+      logger.info(
+        `WhatsApp channel started (connected=${socket.isConnected}) — ${socket.isConnected ? "ready" : "waiting for connection..."}`,
+      );
     },
 
     async stop() {
@@ -160,6 +180,11 @@ export function createWhatsAppChannel(
 
     async send(to: string, payload: ReplyPayload): Promise<string | undefined> {
       if (!socket) {
+        logger.warn(`Cannot send to ${to}: socket not initialized`);
+        return undefined;
+      }
+      if (!socket.isConnected) {
+        logger.warn(`Cannot send to ${to}: socket not connected`);
         return undefined;
       }
 
@@ -192,7 +217,7 @@ export function createWhatsAppChannel(
     },
 
     isReady() {
-      return started;
+      return started && !!socket?.isConnected;
     },
   };
 }

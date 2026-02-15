@@ -44,14 +44,18 @@ export async function handleNewSession(
 
   // Write session summary + daily log
   const memoryDir = expandTilde(config.memory.dir);
-  const filePath = await onSessionEnd({
-    memoryDir,
-    sessionKey,
-    slug,
-    summary,
-  });
-
-  logger.info(`Session ended: ${filePath}`);
+  let filePath: string | undefined;
+  try {
+    filePath = await onSessionEnd({
+      memoryDir,
+      sessionKey,
+      slug,
+      summary,
+    });
+    logger.info(`Session ended: ${filePath}`);
+  } catch (err) {
+    logger.error(`Failed to write session summary: ${err}`);
+  }
 
   // Reset session for next conversation
   const newTranscriptPath = resolveTranscriptPath(`${sessionKey}-${Date.now()}`);

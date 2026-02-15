@@ -272,6 +272,31 @@ describe("createWhatsAppSession", () => {
     expect(makeWASocketMock.mock.calls.length).toBe(initialCallCount);
   });
 
+  it("passes browserName to Browsers.ubuntu()", async () => {
+    const events = makeEvents();
+    await createWhatsAppSession("/tmp/auth", events, "MyBot");
+
+    const baileys = await import("baileys");
+    const socketCalls = vi.mocked(baileys.makeWASocket).mock.calls;
+    const lastCall = socketCalls[socketCalls.length - 1];
+    const options = lastCall[0] as { browser?: unknown };
+
+    // Browsers.ubuntu("MyBot") returns ["Ubuntu", "MyBot", "22.04"]
+    expect(options.browser).toEqual(["Ubuntu", "MyBot", "22.04"]);
+  });
+
+  it("defaults browserName to Jinx when not provided", async () => {
+    const events = makeEvents();
+    await createWhatsAppSession("/tmp/auth", events);
+
+    const baileys = await import("baileys");
+    const socketCalls = vi.mocked(baileys.makeWASocket).mock.calls;
+    const lastCall = socketCalls[socketCalls.length - 1];
+    const options = lastCall[0] as { browser?: unknown };
+
+    expect(options.browser).toEqual(["Ubuntu", "Jinx", "22.04"]);
+  });
+
   it("renders QR code to terminal when received", async () => {
     const onConnectionUpdate = vi.fn();
     await createWhatsAppSession("/tmp/auth", makeEvents({ onConnectionUpdate }));

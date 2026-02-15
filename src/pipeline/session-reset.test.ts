@@ -136,6 +136,38 @@ describe("handleNewSession", () => {
     expect(result.text).toContain("No active session");
   });
 
+  it("handles onSessionEnd failure gracefully — session still resets", async () => {
+    // Use an invalid memory dir that will cause onSessionEnd to fail
+    const config = createTestConfig({ memory: { dir: "/nonexistent/readonly/dir" } });
+    const session = createSessionEntry({
+      sessionKey: "test-session",
+      agentId: "default",
+      channel: "terminal",
+      transcriptPath,
+    });
+    session.turnCount = 5;
+    session.totalInputTokens = 1000;
+    session.totalOutputTokens = 500;
+
+    const sessions: SessionStore = {
+      get: vi.fn(() => session),
+      set: vi.fn(),
+      delete: vi.fn(() => true),
+      list: vi.fn(() => [session]),
+      save: vi.fn(async () => {}),
+      load: vi.fn(async () => {}),
+    };
+
+    // Should NOT throw even though onSessionEnd will fail
+    const result = await handleNewSession(makeMsgContext(), { config, sessions });
+
+    // Session should still be confirmed and reset
+    expect(result.text).toContain("Session saved");
+    expect(session.turnCount).toBe(0);
+    expect(session.totalInputTokens).toBe(0);
+    expect(session.totalOutputTokens).toBe(0);
+  });
+
   it("generates slug from last user message", async () => {
     const config = createTestConfig({ memory: { dir: memoryDir } });
     const session = createSessionEntry({

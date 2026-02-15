@@ -37,6 +37,7 @@ export interface CreateSessionResult {
 export async function createWhatsAppSession(
   authDir: string,
   events: WhatsAppSessionEvents,
+  browserName?: string,
 ): Promise<CreateSessionResult> {
   let connected = false;
   let stopped = false;
@@ -49,7 +50,7 @@ export async function createWhatsAppSession(
 
     const sock = makeWASocket({
       auth: state,
-      browser: Browsers.ubuntu("Jinx"),
+      browser: Browsers.ubuntu(browserName ?? "Jinx"),
     });
 
     currentSock = sock;

@@ -1,3 +1,5 @@
+import os from "node:os";
+import path from "node:path";
 import type { CronService } from "../cron/service.js";
 import type { MemorySearchManager } from "../memory/search-manager.js";
 import type { ContainerManager } from "../sandbox/container-manager.js";
@@ -61,7 +63,9 @@ export async function dispatchInboundMessage(
   // Ensure session exists
   let session = sessions.get(sessionKey);
   if (!session) {
-    const transcriptPath = resolveTranscriptPath(sessionKey);
+    const transcriptPath = ctx.isSystemTest
+      ? path.join(os.tmpdir(), "jinx-test", `${sessionKey.replace(/[^a-zA-Z0-9_-]/g, "_")}.jsonl`)
+      : resolveTranscriptPath(sessionKey);
     session = createSessionEntry({
       sessionKey,
       agentId: ctx.agentId,
@@ -75,8 +79,8 @@ export async function dispatchInboundMessage(
     sessions.set(sessionKey, session);
   }
 
-  // Classify whether this needs deep work (skip for commands and short messages)
-  if (!ctx.isCommand && text.length >= 20) {
+  // Classify whether this needs deep work (skip for commands, short messages, and system tests)
+  if (!ctx.isCommand && !ctx.isSystemTest && text.length >= 20) {
     const classification = await classifyTask(text, config.llm.light);
 
     if (classification.classification === "deep") {
@@ -150,7 +154,7 @@ export async function dispatchInboundMessage(
           transcriptPath: session.transcriptPath,
           config,
           sessions,
-          searchManager: deps.searchManager,
+          searchManager: ctx.isSystemTest ? undefined : deps.searchManager,
           cronService: deps.cronService,
           channels: deps.channels,
           containerManager: deps.containerManager,
@@ -159,6 +163,7 @@ export async function dispatchInboundMessage(
           isGroup: ctx.isGroup,
           groupName: ctx.groupName,
           media: ctx.media,
+          isSystemTest: ctx.isSystemTest,
           onDelta: (delta) => {
             emitStreamEvent(sessionKey, { type: "delta", text: delta });
           },

@@ -19,7 +19,7 @@ export default defineConfig({
       thresholds: {
         lines: 70,
         functions: 70,
-        branches: 55,
+        branches: 65,
         statements: 70,
       },
       include: ["src/**/*.ts"],
@@ -30,42 +30,23 @@ export default defineConfig({
         "src/cli/**",
         "src/tui/**",
         "src/types/**",
-        // Gateway & channel adapters require external connections
-        "src/gateway/server.ts",
-        "src/gateway/client.ts",
-        "src/gateway/chat-client.ts",
-        "src/gateway/startup.ts",
-        "src/gateway/protocol.ts",
+        // Gateway requires external WebSocket connections
+        "src/gateway/**",
+        // Channel adapters requiring live bot connections
         "src/channels/telegram/bot.ts",
-        "src/channels/telegram/handlers.ts",
         "src/channels/telegram/dispatch.ts",
         "src/channels/telegram/send.ts",
         "src/channels/telegram/streaming.ts",
         "src/channels/telegram/access.ts",
         "src/channels/telegram/monitor.ts",
         "src/channels/telegram/media.ts",
-        "src/channels/telegram/context.ts",
         "src/channels/telegram/config.ts",
         "src/channels/whatsapp/session.ts",
         "src/channels/whatsapp/login-qr.ts",
         "src/channels/whatsapp/monitor.ts",
-        "src/channels/whatsapp/context.ts",
-        "src/channels/whatsapp/send.ts",
         "src/channels/whatsapp/media.ts",
         "src/channels/whatsapp/access.ts",
         "src/channels/whatsapp/config.ts",
-        // Provider stubs require real SDK
-        "src/providers/claude-provider.ts",
-        "src/providers/types.ts",
-        // Memory modules requiring SQLite/embeddings
-        "src/memory/schema.ts",
-        "src/memory/embeddings.ts",
-        "src/memory/index-manager.ts",
-        "src/memory/search-manager.ts",
-        // Pipeline dispatch requires full agent runtime
-        "src/pipeline/dispatch.ts",
-        // Re-export only modules
-        "src/cron/types.ts",
         // Test helpers (not production code)
         "src/__test__/**",
       ],

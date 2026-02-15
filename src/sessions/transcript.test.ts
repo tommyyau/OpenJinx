@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import type { TranscriptTurn } from "../types/sessions.js";
+import { LIMITS } from "../infra/security.js";
 import {
   appendTranscriptTurn,
   readTranscript,
@@ -123,5 +124,36 @@ describe("rewriteTranscript", () => {
     const turns = await readTranscript(nestedPath);
     expect(turns).toHaveLength(1);
     expect(turns[0].text).toBe("hello");
+  });
+});
+
+describe("readTranscript edge cases", () => {
+  it("returns empty array when file exceeds MAX_TRANSCRIPT_FILE_BYTES", async () => {
+    // Write a file that exceeds the size limit
+    const bigContent = "x".repeat(LIMITS.MAX_TRANSCRIPT_FILE_BYTES + 1);
+    await fs.writeFile(transcriptPath, bigContent);
+
+    const turns = await readTranscript(transcriptPath);
+    expect(turns).toHaveLength(0);
+  });
+
+  it("returns empty array on non-ENOENT read error (e.g. path is a directory)", async () => {
+    // Create a directory where the file would be — reading it should fail with EISDIR
+    const dirAsFile = path.join(tmpDir, "fake-transcript.jsonl");
+    await fs.mkdir(dirAsFile, { recursive: true });
+
+    const turns = await readTranscript(dirAsFile);
+    expect(turns).toHaveLength(0);
+  });
+
+  it("skips malformed JSON lines and returns valid ones", async () => {
+    const validTurn = JSON.stringify(makeTurn("user", "valid"));
+    const content = `${validTurn}\n{INVALID_JSON\n${JSON.stringify(makeTurn("assistant", "also valid"))}\n`;
+    await fs.writeFile(transcriptPath, content);
+
+    const turns = await readTranscript(transcriptPath);
+    expect(turns).toHaveLength(2);
+    expect(turns[0].text).toBe("valid");
+    expect(turns[1].text).toBe("also valid");
   });
 });

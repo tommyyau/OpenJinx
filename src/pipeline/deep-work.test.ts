@@ -22,6 +22,11 @@ vi.mock("./streaming.js", () => ({
   emitStreamEvent: (...args: unknown[]) => mockEmitStreamEvent(...args),
 }));
 
+const mockReadFile = vi.fn();
+vi.mock("node:fs/promises", () => ({
+  default: { readFile: (...args: unknown[]) => mockReadFile(...args) },
+}));
+
 const { launchDeepWork } = await import("./deep-work.js");
 
 function createMockSessionStore(): SessionStore {
@@ -217,6 +222,86 @@ describe("launchDeepWork", () => {
       type: "final",
       text: "Here is the comparison...",
     });
+  });
+
+  it("extracts written files as media attachments with correct MIME types", async () => {
+    mockReadFile.mockResolvedValue(Buffer.from("# Report content"));
+
+    mockRunAgent.mockResolvedValueOnce({
+      text: "I wrote a file for you.",
+      messages: [
+        {
+          role: "assistant",
+          content: "done",
+          toolCalls: [
+            { id: "tc1", name: "write", input: { path: "/tmp/report.md" }, output: "written" },
+          ],
+        },
+      ],
+      hitTurnLimit: false,
+      usage: { inputTokens: 100, outputTokens: 50, cacheCreationTokens: 0, cacheReadTokens: 0 },
+      durationMs: 1000,
+      model: "sonnet",
+    });
+
+    const config = createTestConfig();
+    const sessions = createMockSessionStore();
+    const channel = createMockChannel();
+
+    launchDeepWork(defaultParams, {
+      config,
+      sessions,
+      channels: new Map([["whatsapp", channel]]),
+    });
+
+    await vi.waitFor(() => {
+      expect(mockDeliverOutboundPayloads).toHaveBeenCalled();
+    });
+
+    const call = mockDeliverOutboundPayloads.mock.calls[0][0];
+    expect(call.payload.media).toBeDefined();
+    expect(call.payload.media).toHaveLength(1);
+    expect(call.payload.media[0].filename).toBe("report.md");
+    expect(call.payload.media[0].mimeType).toBe("text/markdown");
+  });
+
+  it("handles file read failure gracefully during extraction", async () => {
+    mockReadFile.mockRejectedValue(new Error("ENOENT"));
+
+    mockRunAgent.mockResolvedValueOnce({
+      text: "I tried to write a file.",
+      messages: [
+        {
+          role: "assistant",
+          content: "done",
+          toolCalls: [
+            { id: "tc1", name: "write", input: { path: "/tmp/missing.txt" }, output: "written" },
+          ],
+        },
+      ],
+      hitTurnLimit: false,
+      usage: { inputTokens: 100, outputTokens: 50, cacheCreationTokens: 0, cacheReadTokens: 0 },
+      durationMs: 1000,
+      model: "sonnet",
+    });
+
+    const config = createTestConfig();
+    const sessions = createMockSessionStore();
+    const channel = createMockChannel();
+
+    launchDeepWork(defaultParams, {
+      config,
+      sessions,
+      channels: new Map([["whatsapp", channel]]),
+    });
+
+    await vi.waitFor(() => {
+      expect(mockDeliverOutboundPayloads).toHaveBeenCalled();
+    });
+
+    const call = mockDeliverOutboundPayloads.mock.calls[0][0];
+    // No media since file read failed
+    expect(call.payload.media).toBeUndefined();
   });
 
   it("falls back to terminal when channel map is empty", async () => {

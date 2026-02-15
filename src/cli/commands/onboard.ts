@@ -48,4 +48,7 @@ export const onboardCommand = new Command("onboard")
     }
 
     console.log("\nSetup complete! Run `jinx chat` to start a conversation.");
+    console.log(
+      "Tip: For a guided setup experience, run `claude` in the repo root and type `/setup`.",
+    );
   });

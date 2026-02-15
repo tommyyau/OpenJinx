@@ -160,21 +160,43 @@ All fields have sensible defaults — an empty config file works out of the box 
 
 ## Testing
 
-Jinx uses a three-tier test architecture with Vitest:
+Jinx uses a multi-tier test architecture with Vitest:
 
-| Tier        | Command                 | Files   | Tests    | Purpose                           |
-| ----------- | ----------------------- | ------- | -------- | --------------------------------- |
-| Unit        | `pnpm test`             | 119     | 1242     | Individual module behavior        |
-| Integration | `pnpm test:integration` | 2       | 11       | Subsystem boundary tests          |
-| System      | `pnpm test:e2e`         | 8       | 37       | End-to-end multi-subsystem flows  |
-| **All**     | `pnpm test:all`         | **129** | **1290** | Runs all three tiers sequentially |
+| Tier        | Command                 | Purpose                                                              |
+| ----------- | ----------------------- | -------------------------------------------------------------------- |
+| Unit        | `pnpm test`             | Individual module behavior                                           |
+| Integration | `pnpm test:integration` | Subsystem boundary tests                                             |
+| System      | `pnpm test:e2e`         | End-to-end multi-subsystem flows                                     |
+| Live        | `pnpm test:live`        | Live integration tests against real providers (credentials required) |
+| **All**     | `pnpm test:all`         | Runs unit + integration + system tiers sequentially                  |
+
+Testing strategy and architecture: `docs/qa-testing-evaluation.md`. Hardening plan status: `docs/testing-hardening-plan.md`.
+
+### High-signal integration suites
+
+- `src/__integration__/startup-lifecycle.integration.test.ts` validates startup/shutdown hook wiring, awaited teardown ordering, webhook registration, and heartbeat wake integration.
+- `src/__integration__/cron-service-timer.integration.test.ts` validates real `CronService + CronTimer` behavior for due ticks, stop semantics, and backoff/recovery timing.
+- `src/__integration__/dispatch-streaming-order.integration.test.ts` validates stream ordering under same-session serialization and cross-session independence.
+- `src/__integration__/dispatch-timeout-lane.integration.test.ts` validates timeout recovery, lane draining after timeout, and cross-session isolation under a hung turn.
+- `src/__integration__/startup-cron-routing.integration.test.ts` validates startup cron wiring for isolated direct delivery, channel-unavailable fallback, and non-isolated wake enqueuing.
+- `src/__integration__/startup-composio-routing.integration.test.ts` validates Composio trigger startup wiring, trigger-to-heartbeat routing, API-key guards, and shutdown unsubscribe behavior.
+- `src/__integration__/startup-http-webhook-auth.integration.test.ts` validates startup HTTP webhook auth enforcement and Telegram webhook routing through the real HTTP server path.
+- `src/__integration__/startup-wake-retry.integration.test.ts` validates wake coalescing, retry ceilings for unknown agents, and shutdown cancellation of pending wake retries.
+- `src/__integration__/heartbeat-delivery-routing.integration.test.ts` validates heartbeat delivery routing across chunked channel sends, fallback-to-terminal behavior, and suppression contracts.
+- `src/__integration__/gateway-lifecycle.integration.test.ts` validates full WebSocket server+client handshake, auth token rejection/acceptance, concurrent sessions, and clean disconnect.
+- `src/__integration__/whatsapp-inbound.integration.test.ts` validates WhatsApp inbound dispatch with DM/group policy enforcement and JID-based access control.
+- `src/__integration__/telegram-inbound.integration.test.ts` validates Telegram inbound dispatch with DM/group policy enforcement and chatId-based access control.
+- `src/__integration__/pipeline-delivery.integration.test.ts` validates pipeline dispatch, session auto-creation, and streaming event delivery.
+- `src/__integration__/session-lanes.integration.test.ts` validates lane serialization guarantees and cross-session independence.
 
 ### Additional test commands
 
 ```bash
 pnpm test:coverage          # Unit tests with V8 coverage report
 pnpm test:watch             # Watch mode (re-runs on file changes)
+pnpm test:live              # Live integration tests (requires credentials)
 npx vitest run src/path/to/file.test.ts   # Run a single test file
+npx vitest run -c vitest.integration.config.ts src/__integration__/startup-lifecycle.integration.test.ts
 ```
 
 ### Coverage thresholds
@@ -183,17 +205,26 @@ Enforced on every `pnpm test:coverage` run:
 
 | Metric     | Threshold | Current |
 | ---------- | --------- | ------- |
-| Lines      | 70%       | 91.68%  |
-| Statements | 70%       | 90.92%  |
-| Branches   | 55%       | 86.30%  |
-| Functions  | 70%       | 88.21%  |
+| Lines      | 70%       | ~90%    |
+| Statements | 70%       | ~90%    |
+| Branches   | 65%       | ~78%    |
+| Functions  | 70%       | ~91%    |
+
+Current inventory: **128 unit test files (1,356 tests), 20 integration tests (102 tests), 16 system/live tests**.
+
+Use `pnpm test:coverage` to view current coverage numbers.
 
 ### Test file conventions
 
 - Unit tests: colocated as `foo.test.ts` next to `foo.ts`
 - Integration tests: `src/__integration__/*.integration.test.ts`
 - System tests: `src/__system__/*.system.test.ts`
-- Shared test helpers: `src/__test__/` (mock SDK, mock channel, factories)
+- Live tests: `src/__system__/*.live.test.ts` (require real credentials)
+- Shared test helpers: `src/__test__/` (mock SDK, mock channel, factories, live-cleanup)
+
+### Test isolation
+
+Tests that flow through the real pipeline use the `isSystemTest` flag on `MsgContext` to isolate test traffic. When set, transcripts are written to `os.tmpdir()/jinx-test/` instead of `~/.jinx/sessions/`, the classifier is skipped, and memory tools are excluded. A belt-and-suspenders cleanup utility (`src/__test__/live-cleanup.ts`) scans for and removes any leaked test artifacts after each live test suite.
 
 ## Code Quality
 
@@ -238,8 +269,8 @@ openjinx/
 │   ├── workspace/            # Workspace files — bootstrap, loader, filter, trim
 │   ├── tui/                  # Terminal UI (future)
 │   ├── __test__/             # Shared test infrastructure
-│   ├── __integration__/      # Integration tests (6 files)
-│   └── __system__/           # System tests (5 files)
+│   ├── __integration__/      # Integration tests
+│   └── __system__/           # System tests
 ├── skills/                   # Bundled skills (11)
 │   ├── apple-notes/          # Apple Notes (macOS)
 │   ├── apple-reminders/      # Apple Reminders (macOS)
@@ -258,7 +289,8 @@ openjinx/
 ├── tsdown.config.ts
 ├── vitest.config.ts          # Unit test config
 ├── vitest.integration.config.ts
-└── vitest.system.config.ts
+├── vitest.system.config.ts
+└── vitest.live.config.ts
 ```
 
 ## Architecture Overview
