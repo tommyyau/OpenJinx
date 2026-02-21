@@ -120,7 +120,7 @@ describe("runAgentTurn", () => {
 
     expect(result.text).toBe("Hello! How can I help?");
     expect(result.hitTurnLimit).toBe(false);
-    expect(result.model).toBe("claude-sonnet-4-5-20250929");
+    expect(result.model).toBe("claude-sonnet-4-6");
     expect(result.usage.inputTokens).toBe(100);
     expect(result.usage.outputTokens).toBe(50);
     expect(result.durationMs).toBeGreaterThanOrEqual(0);
@@ -281,7 +281,7 @@ describe("runAgentTurn", () => {
     mockStream.mockReturnValue(makeMockStream(makeResponse("ok")));
 
     const opusResult = await runAgentTurn({ ...baseOptions, model: "opus" });
-    expect(opusResult.model).toBe("claude-opus-4-20250514");
+    expect(opusResult.model).toBe("claude-opus-4-6");
 
     const haikuResult = await runAgentTurn({ ...baseOptions, model: "haiku" });
     expect(haikuResult.model).toBe("claude-haiku-4-5-20251001");

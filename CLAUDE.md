@@ -48,7 +48,7 @@ Test files are colocated: `foo.ts` → `foo.test.ts`. Integration tests: `src/__
 
 Coverage thresholds enforced: 70% lines/functions/statements, 65% branches.
 
-Current test inventory: **128 unit test files (1,356 tests), 20 integration test files (102 tests), 16 system/live test files**. Coverage: ~90% statements, ~78% branches, ~91% functions.
+Current test inventory: **155 unit test files (1,619 tests), 24 integration test files (130 tests), 19 system/live test files**. Coverage: ~90% statements, ~78% branches, ~91% functions.
 
 High-signal integration suites:
 
@@ -66,6 +66,10 @@ High-signal integration suites:
 - `src/__integration__/startup-http-webhook-auth.integration.test.ts` (startup HTTP webhook auth + Telegram webhook routing via real HTTP server)
 - `src/__integration__/startup-wake-retry.integration.test.ts` (wake coalescing, retry ceilings, and shutdown cancellation for pending retries)
 - `src/__integration__/heartbeat-delivery-routing.integration.test.ts` (heartbeat chunked delivery routing, fallback-to-terminal, and suppression behavior)
+- `src/__integration__/marathon-executor.integration.test.ts` (marathon chunk execution, checkpoint persistence, abort handling)
+- `src/__integration__/marathon-checkpoint-resume.integration.test.ts` (checkpoint save/load, resume from failure, status transitions)
+- `src/__integration__/marathon-container-lifecycle.integration.test.ts` (persistent container allocation, no idle eviction during marathon)
+- `src/__integration__/marathon-tool-assembly.integration.test.ts` (marathon-specific tool wiring and sandbox integration)
 
 ## Tech Stack & Conventions
 
@@ -152,7 +156,7 @@ Before pushing to GitHub or creating a public repository, read `docs/ci-cd-plan.
 
 ## Security
 
-Security audit report: `docs/security-audit-report.md` — validates all 35 items from the OpenClaw vulnerability register against Jinx. Scorecard: 25 resolved, 7 partially mitigated, 1 vulnerable. The source vulnerability register: `docs/security-checks.md`.
+Security audit report: `docs/security-audit-report.md` — validates all 35 items from the OpenClaw vulnerability register against Jinx. Scorecard: 28 resolved, 7 partially mitigated, 0 vulnerable. The source vulnerability register: `docs/security-checks.md`.
 
 Key security files:
 

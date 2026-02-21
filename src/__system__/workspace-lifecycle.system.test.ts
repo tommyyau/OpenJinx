@@ -95,7 +95,7 @@ describe("Workspace lifecycle system tests", () => {
       tools: [],
       sessionType: "main",
       agentName: "Jinx",
-      model: "claude-sonnet-4-5",
+      model: "claude-sonnet-4-6",
       workspaceDir: "/test/workspace",
       memoryDir: "/test/memory",
     });

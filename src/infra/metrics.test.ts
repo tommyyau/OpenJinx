@@ -26,7 +26,7 @@ function makeTurnMetric(overrides: Partial<TurnMetric> = {}): TurnMetric {
   return {
     timestamp: Date.now(),
     sessionKey: "test-session",
-    model: "claude-sonnet-4-5-20250929",
+    model: "claude-sonnet-4-6",
     inputTokens: 1000,
     outputTokens: 200,
     cacheCreationTokens: 0,

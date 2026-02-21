@@ -105,7 +105,7 @@ describe("Skills → Snapshot → System Prompt integration", () => {
       skills: snapshot,
       sessionType: "main",
       agentName: "Jinx",
-      model: "claude-sonnet-4-5-20250929",
+      model: "claude-sonnet-4-6",
       workspaceDir: tmpDir,
       memoryDir: path.join(tmpDir, "memory"),
     });

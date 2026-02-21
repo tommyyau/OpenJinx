@@ -302,6 +302,7 @@ CronService
 | Deep work         | Live        | Haiku classifier + async Opus executor + file attachments       |
 | Sandbox           | Live        | Apple Container (macOS 26+), idle cleanup, timeouts             |
 | Composio          | Live        | 800+ external integrations with timeout + trigger subscriptions |
+| Marathon agent    | In progress | Checkpoint/resume, chunked execution, container lifecycle       |
 | Token budgeting   | Not started | Fixed MAX_HISTORY_TURNS=40                                      |
 | Subagent runtime  | Not started | Tier exists, no orchestration                                   |
 | Channel tools     | Stubbed     | Schema defined, no wiring                                       |

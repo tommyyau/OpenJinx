@@ -101,6 +101,7 @@ const mockCreateCheckpoint = vi.fn();
 const mockReadCheckpoint = vi.fn();
 const mockAdvanceCheckpoint = vi.fn();
 const mockFailChunk = vi.fn();
+const mockPauseCheckpoint = vi.fn();
 const mockCancelCheckpoint = vi.fn();
 const mockUpdateCheckpointStatus = vi.fn();
 const mockPatchCheckpoint = vi.fn();
@@ -125,6 +126,7 @@ beforeEach(async () => {
   vi.mocked(checkpoint.readCheckpoint).mockImplementation(mockReadCheckpoint);
   vi.mocked(checkpoint.advanceCheckpoint).mockImplementation(mockAdvanceCheckpoint);
   vi.mocked(checkpoint.failChunk).mockImplementation(mockFailChunk);
+  vi.mocked(checkpoint.pauseCheckpoint).mockImplementation(mockPauseCheckpoint);
   vi.mocked(checkpoint.cancelCheckpoint).mockImplementation(mockCancelCheckpoint);
   vi.mocked(checkpoint.updateCheckpointStatus).mockImplementation(mockUpdateCheckpointStatus);
   vi.mocked(checkpoint.patchCheckpoint).mockImplementation(mockPatchCheckpoint);
@@ -376,6 +378,41 @@ describe("launchMarathon", () => {
     expect(mockRunAgent).toHaveBeenCalledTimes(2);
     const repairCall = mockRunAgent.mock.calls[1]?.[0];
     expect(repairCall?.prompt).toContain("previous marathon plan response was invalid");
+  });
+
+  it("fails fast when both initial and repair plans are invalid", async () => {
+    const { launchMarathon } = await import("./marathon.js");
+    const deps = makeDeps();
+
+    mockRunAgent
+      .mockResolvedValueOnce({
+        text: "invalid initial plan",
+        messages: [],
+        usage: { inputTokens: 100, outputTokens: 50 },
+        durationMs: 1000,
+        model: "opus",
+      })
+      .mockResolvedValueOnce({
+        text: "still invalid",
+        messages: [],
+        usage: { inputTokens: 120, outputTokens: 60 },
+        durationMs: 1100,
+        model: "opus",
+      });
+
+    launchMarathon(makeParams(), deps);
+    await new Promise((r) => setTimeout(r, 80));
+
+    expect(mockRunAgent).toHaveBeenCalledTimes(2);
+    expect(mockCreateCheckpoint).not.toHaveBeenCalled();
+
+    const planningFailureDelivery = mockDeliverOutboundPayloads.mock.calls.find(([req]) =>
+      req.payload.text.includes("Marathon planning failed"),
+    );
+    const planningFailureFallback = mockEmitStreamEvent.mock.calls.find(
+      ([, event]) => event.type === "final" && event.text.includes("Marathon planning failed"),
+    );
+    expect(planningFailureDelivery ?? planningFailureFallback).toBeDefined();
   });
 
   it("promotes container to persistent", async () => {
@@ -979,6 +1016,29 @@ describe("marathon hardening", () => {
       expect.stringContaining("marathon-"),
       expect.stringContaining("no files in workspace"),
     );
+  });
+
+  it("authentication errors pause immediately without chunk retry accounting", async () => {
+    const { launchMarathon } = await import("./marathon.js");
+    const deps = makeDeps();
+
+    mockRunAgent.mockResolvedValueOnce({
+      text: JSON.stringify(samplePlan),
+      messages: [],
+      usage: { inputTokens: 100, outputTokens: 50 },
+      durationMs: 1000,
+      model: "opus",
+    });
+    mockCreateCheckpoint.mockResolvedValue(sampleCheckpoint);
+    mockReadCheckpoint.mockResolvedValueOnce({ ...sampleCheckpoint, status: "executing" });
+    mockUpdateCheckpointStatus.mockResolvedValue(undefined);
+    mockRunAgent.mockRejectedValueOnce(new Error("authentication_error: 401 expired"));
+
+    launchMarathon(makeParams(), deps);
+    await new Promise((r) => setTimeout(r, 200));
+
+    expect(mockPauseCheckpoint).toHaveBeenCalledWith(expect.stringContaining("marathon-"));
+    expect(mockFailChunk).not.toHaveBeenCalled();
   });
 
   it("planning prompt communicates maxChunks to the LLM", async () => {

@@ -37,7 +37,7 @@ describe("buildSystemPrompt", () => {
         makeFile("SOUL.md", "# Soul\nBe helpful."),
         makeFile("MEMORY.md", "# Memory\nUser likes TypeScript."),
       ],
-      model: "claude-sonnet-4-5",
+      model: "claude-sonnet-4-6",
       agentName: "Jinx",
     });
 
@@ -49,23 +49,23 @@ describe("buildSystemPrompt", () => {
   it("includes runtime metadata", () => {
     const prompt = buildPrompt({
       agentName: "TestAgent",
-      model: "claude-sonnet-4-5",
+      model: "claude-sonnet-4-6",
     });
 
     expect(prompt).toContain("Agent: TestAgent");
-    expect(prompt).toContain("Model: claude-sonnet-4-5");
+    expect(prompt).toContain("Model: claude-sonnet-4-6");
     expect(prompt).toContain("Session type: main");
   });
 
   it("includes heartbeat section for main sessions", () => {
-    const prompt = buildPrompt({ model: "claude-sonnet-4-5" });
+    const prompt = buildPrompt({ model: "claude-sonnet-4-6" });
     expect(prompt).toContain("HEARTBEAT_OK");
   });
 
   it("excludes heartbeat section for subagent sessions", () => {
     const prompt = buildPrompt({
       sessionType: "subagent",
-      model: "claude-sonnet-4-5",
+      model: "claude-sonnet-4-6",
     });
 
     expect(prompt).not.toContain("HEARTBEAT_OK");

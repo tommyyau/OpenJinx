@@ -2,8 +2,8 @@ import type { ClaudeModelId, ClaudeModelTier } from "../types/config.js";
 
 /** Map from our model IDs to the actual Claude API model strings. */
 const MODEL_ID_MAP: Record<ClaudeModelId, string> = {
-  opus: "claude-opus-4-20250514",
-  sonnet: "claude-sonnet-4-5-20250929",
+  opus: "claude-opus-4-6",
+  sonnet: "claude-sonnet-4-6",
   haiku: "claude-haiku-4-5-20251001",
 };
 

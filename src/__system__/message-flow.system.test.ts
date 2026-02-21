@@ -77,7 +77,7 @@ describe("Message flow system tests", () => {
       tools: getMemoryToolDefinitions(),
       sessionType: "main",
       agentName: agent.name,
-      model: "claude-sonnet-4-5-20250514",
+      model: "claude-sonnet-4-6",
       workspaceDir: "/test/workspace",
       memoryDir: "/test/memory",
     });

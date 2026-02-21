@@ -103,7 +103,7 @@ describe("Memory utilization pipeline", () => {
       tools: [memorySearchTool, memoryGetTool],
       sessionType: "main",
       agentName: "Jinx",
-      model: "claude-sonnet-4-5",
+      model: "claude-sonnet-4-6",
       workspaceDir: harness.workspace.dir,
       memoryDir: harness.workspace.memoryDir,
     };

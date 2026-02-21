@@ -1,6 +1,6 @@
 # OpenJinx Product Roadmap
 
-> **Updated:** 2026-02-16
+> **Updated:** 2026-02-19
 > **Status:** Active
 > **Planning rule:** Marathon remains the active top priority until complete.
 
@@ -152,25 +152,23 @@
 
 **Goal**: Make ingestion + delegated execution safe by default.
 
-**Open high-priority items** (from [security-audit-report.md](./security-audit-report.md)):
+**Current security posture** (from [security-audit-report.md](./security-audit-report.md)): **0 vulnerable, 7 partially mitigated, 28 resolved** across 35 OpenClaw items. All Category 4 (prompt injection) items now mitigated or partially mitigated — injection detection wired in production, identity files protected, memory tools read-only, SSRF validated, untrusted content wrapped.
 
-| Severity | Item | Description                                             |
-| -------- | ---- | ------------------------------------------------------- |
-| HIGH     | 4.4  | Memory write content not validated — poisoning possible |
-| MEDIUM   | 3.3  | API keys stored in plaintext `.env`                     |
-| MEDIUM   | 3.12 | Main session logs accumulate indefinitely               |
-| MEDIUM   | 3.13 | No structured audit trail                               |
-| MEDIUM   | 3.16 | Subagents inherit all parent tools                      |
-| MEDIUM   | 4.1  | Injection detection is log-only, not blocking           |
-| MEDIUM   | 4.2  | Anti-extraction is LLM-layer only                       |
+**Remaining operational hardening items** (all MEDIUM, accepted risk for now):
 
-**Guardrail deliverables aligned to the new strategy**:
+| Item | Description                              | Current State                                         |
+| ---- | ---------------------------------------- | ----------------------------------------------------- |
+| 3.3  | Plaintext `.env`                         | Blocked from mounts + agent file access               |
+| 3.12 | Main session log accumulation            | Cron/subagent sessions reaped, transcripts capped     |
+| 3.13 | No structured audit trail                | Basic logging + secret redaction exists                |
+| 3.16 | Subagents inherit all parent tools       | Identity file protection added                        |
 
-- Memory/document write validation and poisoning controls (policy enforcement, not log-only).
+**Guardrail deliverables for post-Marathon**:
+
 - Capability profiles for subagents and delegated task workers (least privilege by default).
 - Structured audit trails for ingestion, retrieval decisions, approvals, and external actions.
 - Configurable retention and redaction policies for logs/transcripts/artifacts.
-- Progression from detection-only to selective block for high-confidence malicious patterns.
+- Optional keychain integration for credential storage.
 
 **CI/CD**: Designed in [ci-cd-plan.md](./ci-cd-plan.md), pending implementation.
 
