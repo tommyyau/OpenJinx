@@ -67,8 +67,17 @@ export function selectTurnsForCompaction(
  * Build a prompt to ask the LLM to summarize turns for compaction.
  */
 export function buildCompactionPrompt(turns: TranscriptTurn[]): string {
-  const turnTexts = turns.map((t) => `[${t.role}]: ${t.text}`).join("\n\n");
-  return `Summarize the following conversation history into a concise summary. Preserve key facts, decisions, and context that would be important for continuing the conversation. Keep the summary under 2000 characters.\n\n${turnTexts}`;
+  const turnTexts = turns
+    .map((t) => {
+      let entry = `[${t.role}]: ${t.text}`;
+      if (t.toolCalls && t.toolCalls.length > 0) {
+        const tools = t.toolCalls.map((tc) => tc.toolName).join(", ");
+        entry += `\n[Tools used: ${tools}]`;
+      }
+      return entry;
+    })
+    .join("\n\n");
+  return `Summarize the following conversation history into a concise summary. Preserve key facts, decisions, tool usage patterns, and context that would be important for continuing the conversation. Keep the summary under 2000 characters.\n\n${turnTexts}`;
 }
 
 export interface CompactionResult {

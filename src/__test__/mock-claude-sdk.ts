@@ -98,7 +98,7 @@ export function createMockClaudeSdk() {
           systemPrompt: string;
           model: string;
           maxTurns?: number;
-          maxBudgetUsd?: number;
+          maxTokens?: number;
           tools?: unknown[];
           onDelta?: (text: string) => void;
         }) => {

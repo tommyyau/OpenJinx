@@ -603,11 +603,11 @@ The full Zenity Labs attack chain is blocked for automated/background sessions. 
 
 ## Audit Changelog
 
-| Date | Change |
-| --- | --- |
-| 15 Feb 2026 (initial) | Initial audit against all 35 OpenClaw items |
-| 15 Feb 2026 (evening) | Identity file protection added (4.3 mitigated), injection detection wired into production (4.1 mitigated), anti-extraction instructions added (4.2 mitigated) |
-| 19 Feb 2026 | Full code-level re-verification of all Category 4 items. Updated all sections to reflect actual implementation state. Memory write audit chain verified (4.4 → partially mitigated). Scorecard updated: **0 vulnerable items remaining** (was 3 → 1 → 0) |
+| Date                  | Change                                                                                                                                                                                                                                                   |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 15 Feb 2026 (initial) | Initial audit against all 35 OpenClaw items                                                                                                                                                                                                              |
+| 15 Feb 2026 (evening) | Identity file protection added (4.3 mitigated), injection detection wired into production (4.1 mitigated), anti-extraction instructions added (4.2 mitigated)                                                                                            |
+| 19 Feb 2026           | Full code-level re-verification of all Category 4 items. Updated all sections to reflect actual implementation state. Memory write audit chain verified (4.4 → partially mitigated). Scorecard updated: **0 vulnerable items remaining** (was 3 → 1 → 0) |
 
 ### Test Coverage for Security Functions
 
@@ -632,19 +632,19 @@ _None. Previous high-priority item 4.4 (memory poisoning) is now partially mitig
 
 ### MEDIUM (Operational Hardening)
 
-| Item     | Issue                                     | Status           | Notes                                                                                                          |
-| -------- | ----------------------------------------- | ---------------- | -------------------------------------------------------------------------------------------------------------- |
-| **3.3**  | API keys in plaintext `.env`              | Accepted risk    | `.env` blocked from container mounts and agent file access. Keychain integration is a future enhancement.      |
-| **3.12** | Main session logs accumulate indefinitely | Accepted risk    | Cron/subagent sessions reaped after 24h. Transcripts capped at 10MB. Main session rotation is a future item.   |
-| **3.13** | No structured audit trail                 | Accepted risk    | Basic logging with timestamps + secret redaction exists. Structured audit is a post-Marathon enhancement.      |
-| **3.16** | Subagents inherit all parent tools        | Accepted risk    | Identity file protection added. Full capability filtering is a post-Marathon enhancement.                      |
+| Item     | Issue                                     | Status        | Notes                                                                                                        |
+| -------- | ----------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------ |
+| **3.3**  | API keys in plaintext `.env`              | Accepted risk | `.env` blocked from container mounts and agent file access. Keychain integration is a future enhancement.    |
+| **3.12** | Main session logs accumulate indefinitely | Accepted risk | Cron/subagent sessions reaped after 24h. Transcripts capped at 10MB. Main session rotation is a future item. |
+| **3.13** | No structured audit trail                 | Accepted risk | Basic logging with timestamps + secret redaction exists. Structured audit is a post-Marathon enhancement.    |
+| **3.16** | Subagents inherit all parent tools        | Accepted risk | Identity file protection added. Full capability filtering is a post-Marathon enhancement.                    |
 
 ### LOW
 
-| Item      | Issue                                   | Status        | Notes                                                          |
-| --------- | --------------------------------------- | ------------- | -------------------------------------------------------------- |
-| **3.17**  | Telegram webhook `secretToken` optional | Accepted risk | Enforcing when webhook mode is enabled is a future item.       |
-| **Cat 2** | Dependency audit not verified           | Action needed | Run `pnpm audit` to check Jinx-specific transitive deps.      |
+| Item      | Issue                                   | Status        | Notes                                                    |
+| --------- | --------------------------------------- | ------------- | -------------------------------------------------------- |
+| **3.17**  | Telegram webhook `secretToken` optional | Accepted risk | Enforcing when webhook mode is enabled is a future item. |
+| **Cat 2** | Dependency audit not verified           | Action needed | Run `pnpm audit` to check Jinx-specific transitive deps. |
 
 ---
 

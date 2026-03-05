@@ -14,14 +14,18 @@ export const llmSchema = z
     brain: claudeModelId.default("opus"),
     subagent: claudeModelId.default("sonnet"),
     light: claudeModelId.default("haiku"),
-    maxBudgetUsd: z.number().min(0).default(0),
+    maxTokensBrain: z.number().int().min(256).default(16_384),
+    maxTokensSubagent: z.number().int().min(256).default(16_384),
+    maxTokensLight: z.number().int().min(256).default(4_096),
     maxTurns: z.number().int().min(1).default(30),
   })
   .default({
     brain: "opus",
     subagent: "sonnet",
     light: "haiku",
-    maxBudgetUsd: 0,
+    maxTokensBrain: 16_384,
+    maxTokensSubagent: 16_384,
+    maxTokensLight: 4_096,
     maxTurns: 30,
   });
 

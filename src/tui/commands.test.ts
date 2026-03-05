@@ -56,7 +56,15 @@ function makeTuiContext(overrides?: Partial<TuiContext>): TuiContext {
 
   return {
     config: {
-      llm: { brain: "sonnet", subagent: "sonnet", light: "haiku", maxBudgetUsd: 0, maxTurns: 10 },
+      llm: {
+        brain: "sonnet",
+        subagent: "sonnet",
+        light: "haiku",
+        maxTokensBrain: 16_384,
+        maxTokensSubagent: 16_384,
+        maxTokensLight: 4_096,
+        maxTurns: 10,
+      },
       agents: {
         default: "jinx",
         list: [

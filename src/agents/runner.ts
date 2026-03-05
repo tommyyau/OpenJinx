@@ -10,13 +10,13 @@ import type { ContainerManager } from "../sandbox/container-manager.js";
 import type { ChannelPlugin } from "../types/channels.js";
 import type { ClaudeModelTier, JinxConfig } from "../types/config.js";
 import type { MediaAttachment } from "../types/messages.js";
-import type { SessionStore, TranscriptTurn } from "../types/sessions.js";
+import type { SessionStore, TranscriptToolCall, TranscriptTurn } from "../types/sessions.js";
 import { expandTilde } from "../infra/home-dir.js";
 import { createLogger } from "../infra/logger.js";
 import { logTurnMetric } from "../infra/metrics.js";
 import { flushMemoryBeforeCompaction } from "../memory/flush.js";
 import { runAgentTurn as callProvider } from "../providers/claude-provider.js";
-import { getContextWindow, resolveModelString } from "../providers/models.js";
+import { getContextWindow, resolveMaxTokens, resolveModelString } from "../providers/models.js";
 import {
   compactTranscript,
   estimateTranscriptTokens,
@@ -249,7 +249,7 @@ export async function runAgent(options: RunAgentOptions): Promise<AgentResult> {
     sessionId: sessionKey,
     history,
     maxTurns: config.llm.maxTurns,
-    maxBudgetUsd: config.llm.maxBudgetUsd || undefined,
+    maxTokens: resolveMaxTokens(config, modelTier),
     media: options.media,
     onDelta,
   };
@@ -326,7 +326,12 @@ async function loadHistory(transcriptPath: string): Promise<HistoryTurn[]> {
   const history: HistoryTurn[] = [];
   for (const turn of recent) {
     if (turn.role === "user" || turn.role === "assistant") {
-      history.push({ role: turn.role, content: turn.text });
+      // Enrich assistant turns with tool-use context so Claude sees prior tool interactions
+      const content =
+        turn.role === "assistant" && turn.toolCalls && turn.toolCalls.length > 0
+          ? enrichWithToolContext(turn.text, turn.toolCalls)
+          : turn.text;
+      history.push({ role: turn.role, content });
     } else if (turn.role === "system" && turn.isCompaction) {
       // Compaction summaries go as user messages so Claude sees the context
       history.push({ role: "user", content: `[Prior conversation summary]\n\n${turn.text}` });
@@ -355,6 +360,32 @@ async function loadHistory(transcriptPath: string): Promise<HistoryTurn[]> {
   }
 
   return merged;
+}
+
+/** Max chars of tool I/O to include in history enrichment per call. */
+const MAX_TOOL_CONTEXT_CHARS = 500;
+
+/**
+ * Enrich an assistant message with a summary of tool calls it made.
+ * This gives Claude visibility into its prior tool-use patterns in history
+ * without requiring structured tool_use/tool_result blocks (which the
+ * Anthropic API only supports for the current turn).
+ */
+function enrichWithToolContext(text: string, toolCalls: TranscriptToolCall[]): string {
+  const summaries = toolCalls.map((tc) => {
+    const inputStr = typeof tc.input === "string" ? tc.input : JSON.stringify(tc.input);
+    const outputStr = typeof tc.output === "string" ? tc.output : JSON.stringify(tc.output ?? "");
+    const truncInput =
+      inputStr.length > MAX_TOOL_CONTEXT_CHARS
+        ? inputStr.slice(0, MAX_TOOL_CONTEXT_CHARS) + "..."
+        : inputStr;
+    const truncOutput =
+      outputStr.length > MAX_TOOL_CONTEXT_CHARS
+        ? outputStr.slice(0, MAX_TOOL_CONTEXT_CHARS) + "..."
+        : outputStr;
+    return `- ${tc.toolName}(${truncInput}) → ${truncOutput}`;
+  });
+  return `${text}\n\n[Tools used: ${toolCalls.length}]\n${summaries.join("\n")}`;
 }
 
 /**

@@ -156,12 +156,12 @@
 
 **Remaining operational hardening items** (all MEDIUM, accepted risk for now):
 
-| Item | Description                              | Current State                                         |
-| ---- | ---------------------------------------- | ----------------------------------------------------- |
-| 3.3  | Plaintext `.env`                         | Blocked from mounts + agent file access               |
-| 3.12 | Main session log accumulation            | Cron/subagent sessions reaped, transcripts capped     |
-| 3.13 | No structured audit trail                | Basic logging + secret redaction exists                |
-| 3.16 | Subagents inherit all parent tools       | Identity file protection added                        |
+| Item | Description                        | Current State                                     |
+| ---- | ---------------------------------- | ------------------------------------------------- |
+| 3.3  | Plaintext `.env`                   | Blocked from mounts + agent file access           |
+| 3.12 | Main session log accumulation      | Cron/subagent sessions reaped, transcripts capped |
+| 3.13 | No structured audit trail          | Basic logging + secret redaction exists           |
+| 3.16 | Subagents inherit all parent tools | Identity file protection added                    |
 
 **Guardrail deliverables for post-Marathon**:
 

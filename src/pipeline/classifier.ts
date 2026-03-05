@@ -40,6 +40,7 @@ export async function classifyTask(
       systemPrompt: CLASSIFIER_PROMPT,
       model,
       maxTurns: 1,
+      maxTokens: 256,
       sessionId: "classifier",
     });
 

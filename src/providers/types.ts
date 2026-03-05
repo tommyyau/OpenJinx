@@ -58,7 +58,8 @@ export interface AgentTurnOptions {
   /** Prior conversation turns to prepend before the current prompt. */
   history?: HistoryTurn[];
   maxTurns?: number;
-  maxBudgetUsd?: number;
+  /** Max output tokens for this turn. */
+  maxTokens?: number;
   /** Media attachments from the user message (images become vision inputs). */
   media?: MediaAttachment[];
   /** Callback for streaming partial messages. */

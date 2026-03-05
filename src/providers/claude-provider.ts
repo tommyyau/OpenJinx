@@ -26,6 +26,12 @@ const logger = createLogger("claude");
 /** Maximum characters for a single tool result before truncation. */
 const MAX_TOOL_RESULT_CHARS = 100_000;
 
+/** Default max output tokens when not specified. */
+const DEFAULT_MAX_TOKENS = 16_384;
+
+/** Models that support adaptive thinking. */
+const ADAPTIVE_THINKING_MODELS = new Set(["claude-opus-4-6", "claude-sonnet-4-6"]);
+
 /**
  * Run a single agent turn using the Anthropic SDK with true streaming.
  * Handles multi-turn tool use loops automatically.
@@ -35,6 +41,7 @@ export async function runAgentTurn(options: AgentTurnOptions): Promise<AgentResu
   const start = Date.now();
   const auth = resolveAuth();
   const modelString = resolveModelString(options.model);
+  const maxTokens = options.maxTokens ?? DEFAULT_MAX_TOKENS;
 
   logger.debug(`Starting agent turn with model=${modelString}`);
 
@@ -66,118 +73,152 @@ export async function runAgentTurn(options: AgentTurnOptions): Promise<AgentResu
   let turns = 0;
   const maxTurns = options.maxTurns ?? 30;
 
+  // Enable adaptive thinking for models that support it
+  const thinkingParam = ADAPTIVE_THINKING_MODELS.has(modelString)
+    ? { type: "adaptive" as const }
+    : undefined;
+
   while (turns < maxTurns) {
     turns++;
 
-    // Use streaming to get text deltas in real-time
-    const stream = client.messages.stream({
-      model: modelString,
-      max_tokens: 16_384,
-      system: systemParam,
-      messages,
-      tools: tools.length > 0 ? tools : undefined,
-    });
-
-    // Stream text deltas to the caller as they arrive
-    if (options.onDelta) {
-      stream.on("text", (text) => {
-        options.onDelta!(text);
-      });
-    }
-
-    // Wait for the complete response
-    const response = await stream.finalMessage();
-
-    totalInputTokens += response.usage.input_tokens;
-    totalOutputTokens += response.usage.output_tokens;
-    totalCacheCreation += response.usage.cache_creation_input_tokens ?? 0;
-    totalCacheRead += response.usage.cache_read_input_tokens ?? 0;
-
-    // Extract text and tool use blocks from the final message
-    const textBlocks = response.content.filter(
-      (b): b is ContentBlock & { type: "text" } => b.type === "text",
-    );
-    const toolUseBlocks = response.content.filter(
-      (b): b is ContentBlock & { type: "tool_use"; id: string; name: string; input: unknown } =>
-        b.type === "tool_use",
-    );
-    const responseText = textBlocks.map((b) => b.text).join("");
-
-    // Record assistant message
-    const agentMsg: AgentMessage = {
-      role: "assistant",
-      content: responseText,
-      toolCalls: toolUseBlocks.map((b) => ({
-        id: b.id,
-        name: b.name,
-        input: b.input,
-      })),
-    };
-    agentMessages.push(agentMsg);
-
-    // Add assistant message to conversation
-    messages.push({ role: "assistant", content: response.content });
-
-    // If no tool use or stop reason is "end_turn", we're done
-    if (toolUseBlocks.length === 0 || response.stop_reason === "end_turn") {
-      return {
-        text: responseText,
-        messages: agentMessages,
-        hitTurnLimit: false,
-        usage: {
-          inputTokens: totalInputTokens,
-          outputTokens: totalOutputTokens,
-          cacheCreationTokens: totalCacheCreation,
-          cacheReadTokens: totalCacheRead,
-        },
-        durationMs: Date.now() - start,
+    try {
+      // Use streaming to get text deltas in real-time
+      const stream = client.messages.stream({
         model: modelString,
-      };
-    }
+        max_tokens: maxTokens,
+        system: systemParam,
+        messages,
+        tools: tools.length > 0 ? tools : undefined,
+        ...(thinkingParam ? { thinking: thinkingParam } : {}),
+      });
 
-    // Execute tools and build results
-    const toolResults: ToolResultBlockParam[] = [];
-    for (const toolUse of toolUseBlocks) {
-      const toolDef = options.tools?.find((t) => t.name === toolUse.name);
-      if (!toolDef) {
-        toolResults.push({
-          type: "tool_result",
-          tool_use_id: toolUse.id,
-          content: `Error: Unknown tool "${toolUse.name}"`,
-          is_error: true,
+      // Stream text deltas to the caller as they arrive
+      if (options.onDelta) {
+        stream.on("text", (text) => {
+          options.onDelta!(text);
         });
+      }
+
+      // Wait for the complete response
+      const response = await stream.finalMessage();
+
+      totalInputTokens += response.usage.input_tokens;
+      totalOutputTokens += response.usage.output_tokens;
+      totalCacheCreation += response.usage.cache_creation_input_tokens ?? 0;
+      totalCacheRead += response.usage.cache_read_input_tokens ?? 0;
+
+      // Handle pause_turn: server-side tool hit iteration limit, re-send to continue
+      if (response.stop_reason === "pause_turn") {
+        messages.length = 0;
+        // Re-send history + current turn context so server can resume
+        if (options.history && options.history.length > 0) {
+          for (const turn of options.history) {
+            messages.push({ role: turn.role, content: turn.content });
+          }
+        }
+        messages.push({ role: "user", content: userContent });
+        messages.push({ role: "assistant", content: response.content });
+        logger.debug("pause_turn: server paused, re-sending to continue");
         continue;
       }
 
-      try {
-        const output = await toolDef.execute(toolUse.input);
-        const outputStr = truncateToolResult(
-          typeof output === "string" ? output : JSON.stringify(output),
-        );
-        toolResults.push({
-          type: "tool_result",
-          tool_use_id: toolUse.id,
-          content: outputStr,
-        });
+      // Extract text and tool use blocks from the final message
+      const textBlocks = response.content.filter(
+        (b): b is ContentBlock & { type: "text" } => b.type === "text",
+      );
+      const toolUseBlocks = response.content.filter(
+        (b): b is ContentBlock & { type: "tool_use"; id: string; name: string; input: unknown } =>
+          b.type === "tool_use",
+      );
+      const responseText = textBlocks.map((b) => b.text).join("");
 
-        // Record tool output on the agent message
-        const call = agentMsg.toolCalls?.find((c) => c.id === toolUse.id);
-        if (call) {
-          call.output = output;
-        }
-      } catch (err) {
-        const errMsg = err instanceof Error ? err.message : String(err);
-        toolResults.push({
-          type: "tool_result",
-          tool_use_id: toolUse.id,
-          content: `Error: ${errMsg}`,
-          is_error: true,
-        });
+      // Record assistant message
+      const agentMsg: AgentMessage = {
+        role: "assistant",
+        content: responseText,
+        toolCalls: toolUseBlocks.map((b) => ({
+          id: b.id,
+          name: b.name,
+          input: b.input,
+        })),
+      };
+      agentMessages.push(agentMsg);
+
+      // Add assistant message to conversation (preserve full content including thinking blocks)
+      messages.push({ role: "assistant", content: response.content });
+
+      // If no tool use or stop reason is "end_turn", we're done
+      if (toolUseBlocks.length === 0 || response.stop_reason === "end_turn") {
+        return {
+          text: responseText,
+          messages: agentMessages,
+          hitTurnLimit: false,
+          usage: {
+            inputTokens: totalInputTokens,
+            outputTokens: totalOutputTokens,
+            cacheCreationTokens: totalCacheCreation,
+            cacheReadTokens: totalCacheRead,
+          },
+          durationMs: Date.now() - start,
+          model: modelString,
+        };
       }
-    }
 
-    // Add tool results to conversation
-    messages.push({ role: "user", content: toolResults });
+      // Execute tools and build results
+      const toolResults: ToolResultBlockParam[] = [];
+      for (const toolUse of toolUseBlocks) {
+        const toolDef = options.tools?.find((t) => t.name === toolUse.name);
+        if (!toolDef) {
+          toolResults.push({
+            type: "tool_result",
+            tool_use_id: toolUse.id,
+            content: `Error: Unknown tool "${toolUse.name}"`,
+            is_error: true,
+          });
+          continue;
+        }
+
+        try {
+          const output = await toolDef.execute(toolUse.input);
+          const outputStr = truncateToolResult(
+            typeof output === "string" ? output : JSON.stringify(output),
+          );
+          toolResults.push({
+            type: "tool_result",
+            tool_use_id: toolUse.id,
+            content: outputStr,
+          });
+
+          // Record tool output on the agent message
+          const call = agentMsg.toolCalls?.find((c) => c.id === toolUse.id);
+          if (call) {
+            call.output = output;
+          }
+        } catch (err) {
+          const errMsg = err instanceof Error ? err.message : String(err);
+          toolResults.push({
+            type: "tool_result",
+            tool_use_id: toolUse.id,
+            content: `Error: ${errMsg}`,
+            is_error: true,
+          });
+        }
+      }
+
+      // Add tool results to conversation
+      messages.push({ role: "user", content: toolResults });
+    } catch (err) {
+      // Typed error handling for Anthropic API errors
+      if (Anthropic.RateLimitError && err instanceof Anthropic.RateLimitError) {
+        logger.warn(`Rate limited on turn ${turns}: ${err.message}`);
+        throw err;
+      }
+      if (Anthropic.APIError && err instanceof Anthropic.APIError) {
+        logger.error(`API error ${err.status} on turn ${turns}: ${err.message}`);
+        throw err;
+      }
+      throw err;
+    }
   }
 
   // Hit turn limit
@@ -341,4 +382,6 @@ export const _internal = {
   buildUserContentWithMedia,
   truncateToolResult,
   MAX_TOOL_RESULT_CHARS,
+  ADAPTIVE_THINKING_MODELS,
+  DEFAULT_MAX_TOKENS,
 };

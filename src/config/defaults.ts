@@ -6,7 +6,9 @@ export const DEFAULT_CONFIG: JinxConfig = {
     brain: "opus",
     subagent: "sonnet",
     light: "haiku",
-    maxBudgetUsd: 0,
+    maxTokensBrain: 16_384,
+    maxTokensSubagent: 16_384,
+    maxTokensLight: 4_096,
     maxTurns: 30,
   },
   agents: {

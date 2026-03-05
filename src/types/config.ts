@@ -30,8 +30,12 @@ export interface LlmConfig {
   subagent: ClaudeModelId;
   /** Model for lightweight tasks (slug generation, summaries). */
   light: ClaudeModelId;
-  /** Max budget per agent turn in USD (0 = unlimited). */
-  maxBudgetUsd: number;
+  /** Max output tokens for brain-tier turns. */
+  maxTokensBrain: number;
+  /** Max output tokens for subagent-tier turns. */
+  maxTokensSubagent: number;
+  /** Max output tokens for light-tier turns. */
+  maxTokensLight: number;
   /** Max agentic turns per invocation. */
   maxTurns: number;
 }

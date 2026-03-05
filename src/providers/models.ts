@@ -1,4 +1,4 @@
-import type { ClaudeModelId, ClaudeModelTier } from "../types/config.js";
+import type { ClaudeModelId, ClaudeModelTier, JinxConfig } from "../types/config.js";
 
 /** Map from our model IDs to the actual Claude API model strings. */
 const MODEL_ID_MAP: Record<ClaudeModelId, string> = {
@@ -31,6 +31,19 @@ export function resolveModelForTier(
 export function getContextWindow(_modelId: ClaudeModelId): number {
   // All current Claude models have 200K context
   return 200_000;
+}
+
+/** Resolve max output tokens for a model tier from config. */
+export function resolveMaxTokens(config: JinxConfig, tier: ClaudeModelTier): number {
+  const { llm } = config;
+  switch (tier) {
+    case "brain":
+      return llm.maxTokensBrain;
+    case "subagent":
+      return llm.maxTokensSubagent;
+    case "light":
+      return llm.maxTokensLight;
+  }
 }
 
 /** Check if a model ID is valid. */
