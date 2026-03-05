@@ -168,7 +168,7 @@ OpenClaw allowed unauthenticated local clients to write configuration via `confi
 **Rationale:**
 
 - Default bind is `127.0.0.1` (`src/config/defaults.ts:54`, `src/config/schema.ts:193`)
-- Port 18790 (different from OpenClaw's 18789)
+- Port 9790 (different from OpenClaw's 18789)
 - No network exposure by default
 
 **Files Examined:** `src/config/defaults.ts`, `src/config/schema.ts`, `src/gateway/server.ts:46`

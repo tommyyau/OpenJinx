@@ -213,10 +213,10 @@ describe("bootGateway lifecycle integration", () => {
       },
       gateway: {
         host: "127.0.0.1",
-        port: 18790,
+        port: 9790,
         http: {
           enabled: true,
-          port: 18791,
+          port: 9791,
           hooks: { enabled: true },
         },
       },

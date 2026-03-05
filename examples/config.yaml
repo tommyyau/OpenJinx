@@ -77,13 +77,13 @@ cron:
 # Gateway server
 gateway:
   host: 127.0.0.1
-  port: 18790 # WebSocket port
+  port: 9790 # WebSocket port
   # authToken: "your-ws-auth-token"
 
   # HTTP server (webhooks, health check)
   http:
     enabled: false
-    port: 18791
+    port: 9791
     hooks:
       enabled: false
       # authToken: "your-hook-secret"

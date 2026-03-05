@@ -250,7 +250,7 @@ CronService
 10. onHeartbeatEvent         — Subscribe delivery to channels
 11. CronService              — Load persisted jobs, start timer
 12. startTriggerSubscriber() — Composio Pusher triggers (if enabled)
-13. createGatewayServer()    — WebSocket on 127.0.0.1:18790
+13. createGatewayServer()    — WebSocket on 127.0.0.1:9790
 14. createTelegramChannel()  — Long-polling or webhook (if configured)
 15. createWhatsAppChannel()  — Baileys (if configured)
 16. SessionReaper            — Sweeps cron: and deepwork: sessions

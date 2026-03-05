@@ -28,7 +28,7 @@ export function createHttpServer(deps: HttpServerDeps): HttpServer {
   const { config, sessions, startedAt } = deps;
   const httpConfig = config.gateway.http;
   const host = config.gateway.host;
-  const port = httpConfig?.port ?? 18791;
+  const port = httpConfig?.port ?? 9791;
   const hooksConfig = httpConfig?.hooks;
 
   let server: http.Server | undefined;

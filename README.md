@@ -141,7 +141,7 @@ channels:
 
 gateway:
   host: 127.0.0.1
-  port: 18790
+  port: 9790
 ```
 
 All fields have sensible defaults. An empty config file works out of the box with terminal channel only, and Claude auth resolves from env vars (`~/.jinx/.env` is auto-loaded) or macOS Keychain. See [Authentication](#authentication) above for the exact priority chain.

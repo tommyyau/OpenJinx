@@ -15,7 +15,7 @@ describe("jinxConfigSchema", () => {
     expect(result.data.channels.telegram.enabled).toBe(false);
     expect(result.data.heartbeat.visibility.showOk).toBe(false);
     expect(result.data.heartbeat.visibility.showAlerts).toBe(true);
-    expect(result.data.gateway.port).toBe(18790);
+    expect(result.data.gateway.port).toBe(9790);
     expect(result.data.logging.level).toBe("info");
   });
 

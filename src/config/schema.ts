@@ -189,15 +189,15 @@ const hooksSchema = z
 const httpSchema = z
   .object({
     enabled: z.boolean().default(false),
-    port: z.number().int().min(1).max(65535).default(18791),
+    port: z.number().int().min(1).max(65535).default(9791),
     hooks: hooksSchema,
   })
-  .default({ enabled: false, port: 18791, hooks: { enabled: false } });
+  .default({ enabled: false, port: 9791, hooks: { enabled: false } });
 
 export const gatewaySchema = z
   .object({
     host: z.string().default("127.0.0.1"),
-    port: z.number().int().min(1).max(65535).default(18790),
+    port: z.number().int().min(1).max(65535).default(9790),
     authToken: z.string().optional(),
     allowedOrigins: z.array(z.string()).optional(),
     maxPayloadBytes: z.number().int().min(1024).optional(),
@@ -205,8 +205,8 @@ export const gatewaySchema = z
   })
   .default({
     host: "127.0.0.1",
-    port: 18790,
-    http: { enabled: false, port: 18791, hooks: { enabled: false } },
+    port: 9790,
+    http: { enabled: false, port: 9791, hooks: { enabled: false } },
   });
 
 // ── Logging ──────────────────────────────────────────────────────────────
